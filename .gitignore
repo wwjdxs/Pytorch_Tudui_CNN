@@ -1,1 +1,4 @@
 Pytorch/data/cifar-10-python.tar.gz
+data/
+Pytorch/data/
+Pytorch/code/logs/
