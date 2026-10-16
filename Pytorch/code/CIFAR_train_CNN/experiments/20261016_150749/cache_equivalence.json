@@ -1,0 +1,32 @@
+[
+  {
+    "index": 0,
+    "seed": 1,
+    "equal": true
+  },
+  {
+    "index": 0,
+    "seed": 42,
+    "equal": true
+  },
+  {
+    "index": 123,
+    "seed": 1,
+    "equal": true
+  },
+  {
+    "index": 123,
+    "seed": 42,
+    "equal": true
+  },
+  {
+    "index": 4567,
+    "seed": 1,
+    "equal": true
+  },
+  {
+    "index": 4567,
+    "seed": 42,
+    "equal": true
+  }
+]

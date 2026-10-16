@@ -2,3 +2,8 @@ Pytorch/data/cifar-10-python.tar.gz
 data/
 Pytorch/data/
 Pytorch/code/logs/
+# Python caches and newly generated temporary training events
+__pycache__/
+*.py[cod]
+/Pytorch/code/CNN_baseline_results/**/tensorboard/
+/Pytorch/code/CIFAR_train_CNN/**/events.out.tfevents.*

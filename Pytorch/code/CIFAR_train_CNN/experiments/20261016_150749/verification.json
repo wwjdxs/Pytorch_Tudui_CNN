@@ -1,0 +1,6 @@
+{
+  "last.pth_identical": true,
+  "best.pth_identical": true,
+  "all_epoch_metrics_identical_except_time": true,
+  "final_source_matches_snapshot": true
+}
