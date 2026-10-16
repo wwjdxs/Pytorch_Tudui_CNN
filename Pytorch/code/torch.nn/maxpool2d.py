@@ -1,3 +1,8 @@
+from pathlib import Path
+
+# 相对于仓库Pytorch目录定位数据和输出，不依赖E盘或启动位置。
+PROJECT_DIR = Path(__file__).resolve().parents[2]
+
 import torch
 import torch.nn as nn
 import torchvision
@@ -7,7 +12,7 @@ from torch.utils.tensorboard import SummaryWriter
 #最大池化的作用：保留数据特征但是减少数据量，降低计算量，防止过拟合
 #卷积-池化-非线性激活
 
-dataset=torchvision.datasets.CIFAR10(root='./data', train=False, download=False, transform=torchvision.transforms.ToTensor())
+dataset=torchvision.datasets.CIFAR10(root=str(PROJECT_DIR / 'data'), train=False, download=False, transform=torchvision.transforms.ToTensor())
 
 dataloader=DataLoader(dataset,batch_size=64)
 
@@ -22,7 +27,7 @@ class MaxPool2d(nn.Module):
 
 maxpool2d = MaxPool2d()
 
-writer = SummaryWriter(r'E:\DeepLearning\deep_learning_pytorch2.14\dataLoader')
+writer = SummaryWriter(str(PROJECT_DIR / 'dataLoader'))
 
 step = 0
 for data in dataloader:

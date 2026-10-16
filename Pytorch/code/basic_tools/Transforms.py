@@ -1,3 +1,8 @@
+from pathlib import Path
+
+# 相对于仓库Pytorch目录定位数据和输出，不依赖E盘或启动位置。
+PROJECT_DIR = Path(__file__).resolve().parents[2]
+
 from os import write
 
 from torchvision import transforms
@@ -11,7 +16,7 @@ from PIL import Image
 #1.transforms.ToTensor如何使用
 #2.Tensor数据类型的优点
 
-img_path=r'E:\DeepLearning\deep_learning_pytorch2.14\data\train\ants\0013035.jpg'
+img_path=str(PROJECT_DIR / 'data/train/ants/0013035.jpg')
 img=Image.open(img_path)
 #img是PIL图像数据类型
 
@@ -26,3 +31,5 @@ print(dir(image1)) #查看tensor图片数据的属性和方法
 
 writer=SummaryWriter('log')#class
 writer.add_image('img',image1) #将tensor数据类型的图片写入到tensorboard中
+
+writer.close()

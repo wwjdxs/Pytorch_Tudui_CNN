@@ -1,3 +1,7 @@
+from pathlib import Path
+
+MODEL_DIR = Path(__file__).resolve().parent
+
 import torch
 import torchvision
 import torch.nn as nn
@@ -6,11 +10,11 @@ import torch.nn as nn
 vgg16 = torchvision.models.vgg16(weights=None)#参数没有经过预训练的vgg16模型
 
 #保存方式1：保存完整模型对象
-torch.save(vgg16, 'vgg16_model1.pth')
+torch.save(vgg16, MODEL_DIR / 'vgg16_model1.pth')
 
 
 #保存方式2：
-torch.save(vgg16.state_dict(), 'vgg16_model2.pth')#只保存模型参数
+torch.save(vgg16.state_dict(), MODEL_DIR / 'vgg16_model2.pth')#只保存模型参数
 
 
 #陷阱
@@ -26,7 +30,7 @@ class MyModel(nn.Module):
 
 
 model = MyModel()
-torch.save(model, 'mymodel.pth')  #保存完整模型对象
+torch.save(model, MODEL_DIR / 'mymodel.pth')  #保存完整模型对象
 
 
 

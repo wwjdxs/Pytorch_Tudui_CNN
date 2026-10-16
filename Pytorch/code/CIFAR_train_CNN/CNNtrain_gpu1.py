@@ -6,8 +6,8 @@ import torchvision
 import torch.nn as nn
 from torch.utils.data import DataLoader, Subset
 
-# 实验阶段：09_loss_mean。seed固定，使用同一训练/验证划分。
-# 直接运行本文件会训练本阶段；批量逐步实验请运行CNN_experiment_runner.py。
+# 当前最终配置：seed固定，使用与历史实验相同的训练/验证划分。
+# 历史09阶段源码保存在experiments中；本入口只修复路径与共享模型，不改变网络设置。
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 torch.manual_seed(42)
 if torch.cuda.is_available():
@@ -18,33 +18,11 @@ torch.backends.cudnn.deterministic = True
 os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"
 torch.use_deterministic_algorithms(True)
 
-class cifar10(nn.Module):
-    def __init__(self):
-        super().__init__()
-        self.model = nn.Sequential(
-            nn.Conv2d(3, 32, kernel_size=5, padding=2, bias=False),
-            nn.BatchNorm2d(32),
-            nn.ReLU(),
-            nn.MaxPool2d(2),
-            nn.Conv2d(32, 32, kernel_size=5, padding=2, bias=False),
-            nn.BatchNorm2d(32),
-            nn.ReLU(),
-            nn.MaxPool2d(2),
-            nn.Conv2d(32, 64, kernel_size=5, padding=2, bias=False),
-            nn.BatchNorm2d(64),
-            nn.ReLU(),
-            nn.MaxPool2d(2),
-            nn.Flatten(),
-            nn.Linear(1024, 64),
-            nn.ReLU(),
-            nn.Linear(64, 10)
-        )
-
-    def forward(self, x):
-        return self.model(x)
+# 与测试脚本共用模型定义，避免训练和加载结构不一致。
+from CNNmodel import cifar10
 
 # 仅训练集应用随机增强；验证集使用确定性预处理。
-data_path = r"E:\DeepLearning\deep_learning_pytorch2.14\Pytorch\data"
+data_path = os.environ.get("CNN_DATA_DIR", os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "data")))
 train_transform = torchvision.transforms.Compose([
     torchvision.transforms.RandomCrop(32, padding=4),
     torchvision.transforms.RandomHorizontalFlip(),
@@ -83,8 +61,8 @@ optimizer = torch.optim.SGD(cifar.parameters(), lr=learning_rate, momentum=0.9)
 scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.1)
 epoch = 30
 current_path = os.path.dirname(os.path.abspath(__file__))
-# 批量实验器可指定隔离的输出目录，直接运行时使用本阶段默认目录。
-save_path = os.environ.get("CNN_EXPERIMENT_OUTPUT", os.path.join(current_path, "experiments", "09_loss_mean"))
+# 每次直接运行使用新的runs目录，避免覆盖已发布的历史实验。
+save_path = os.environ.get("CNN_EXPERIMENT_OUTPUT", os.path.join(current_path, "runs", "final_" + time.strftime("%Y%m%d_%H%M%S")))
 os.makedirs(save_path, exist_ok=True)
 best_validation_accuracy = -1
 history = []

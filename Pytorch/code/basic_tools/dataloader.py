@@ -1,3 +1,8 @@
+from pathlib import Path
+
+# 相对于仓库Pytorch目录定位数据和输出，不依赖E盘或启动位置。
+PROJECT_DIR = Path(__file__).resolve().parents[2]
+
 #dataloader 从 dataset 中加载数据
 
 from torch.utils.data import DataLoader
@@ -6,7 +11,7 @@ import torchvision.datasets as datasets
 import torchvision.transforms as transforms 
 #导入 dataset
 
-test_dataset = datasets.CIFAR10(root='./data', train=False, transform=transforms.ToTensor())
+test_dataset = datasets.CIFAR10(root=str(PROJECT_DIR / 'data'), train=False, transform=transforms.ToTensor())
 
 test_loader = DataLoader(dataset=test_dataset, batch_size=64, shuffle=False)#取64张图片作为一个 batch打包，shuffle=False 表示不打乱数据
 

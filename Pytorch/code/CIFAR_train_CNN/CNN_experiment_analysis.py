@@ -27,6 +27,8 @@ def wilson(p, n=10000):
 
 
 def main():
+    if len(sys.argv) != 2:
+        raise SystemExit("用法：python CNN_experiment_analysis.py 实验目录")
     output=Path(sys.argv[1]).resolve()
     rows=json.loads((output/"summary.json").read_text())
     assert len(rows)==10 and all("test_accuracy" in row for row in rows), "实验尚未全部完成"
@@ -138,10 +140,10 @@ def main():
               "8. BatchNorm：每个卷积后添加`nn.BatchNorm2d(out_channels)`再接ReLU，并将该卷积设为`bias=False`。BN增加的缩放/偏移参数与移除的bias需一并记录。",
               "9. loss口径：先累计`loss.item() * imgs.size(0)`，再除以数据集大小；这一统计量位于反向传播以外，不参与参数更新。",
               "\n## 文件与复现\n",
-              "- `CNN_experiment_runner.py`：按预定次序生成脚本、逐步训练、统一测试。",
+              "- `CNN_experiment_runner.py`：在隔离的阶段目录生成脚本、逐步训练、统一测试，不改写当前训练入口。",
               "- `protocol.json`：预先固定的设置；`summary.csv/json`：总表；`changes.patch`：相邻版本逐行差异。",
               "- 每步目录的`CNNtrain_gpu1.py`保存当时版本，`metrics.csv`为逐轮结果，`best.pth/last.pth`为权重，`evaluation.json`包含混淆矩阵。",
-              "- `original_CNNtrain_gpu1.py`为原始备份。当前主脚本保留最后一步设置。",
+              "- `original_CNNtrain_gpu1.py`为原始备份。历史阶段脚本保持当时版本；当前入口可能有后续兼容性修复，以Git记录为准。",
               "- `experiment_comparison.png/pdf`：学习曲线、阶段准确率、泛化差距和耗时；`class_recall.png`：类别召回率。",
               "- 图表编号0至9对应总表阶段顺序。以下为直接嵌入的结果图。",
               "\n![逐步实验结果](experiments/"+output.name+"/experiment_comparison.png)",
@@ -156,7 +158,7 @@ def main():
     local_report = report.replace("experiments/"+output.name+"/", "./")
     (output/"analysis.md").write_text(local_report,encoding="utf-8")
     log=output.parent.parent/("CNN实验日志_"+output.name+".md")
-    prefix = log.read_text(encoding="utf-8").split("\n\n# 实测汇总与分析")[0]
+    prefix = log.read_text(encoding="utf-8").split("\n\n# 实测汇总与分析")[0] if log.exists() else "# CNN逐步改进实验日志\n"
     log.write_text(prefix + report, encoding="utf-8")
     print("Analysis and figures written:",log)
 

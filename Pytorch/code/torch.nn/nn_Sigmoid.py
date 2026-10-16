@@ -1,10 +1,15 @@
+from pathlib import Path
+
+# 相对于仓库Pytorch目录定位数据和输出，不依赖E盘或启动位置。
+PROJECT_DIR = Path(__file__).resolve().parents[2]
+
 import torch
 import torch.nn as nn
 import torchvision
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 
-dataset=torchvision.datasets.CIFAR10(root="./data", train=False, transform=torchvision.transforms.ToTensor(), download=False)
+dataset=torchvision.datasets.CIFAR10(root=str(PROJECT_DIR / 'data'), train=False, transform=torchvision.transforms.ToTensor(), download=False)
 
 dataloader = DataLoader(dataset, batch_size=64, shuffle=False)
 
@@ -20,7 +25,7 @@ class non_linear(nn.Module):
     def forward(self, input):
         return self.sigmoid(input)
 
-writer = SummaryWriter(r'E:\DeepLearning\deep_learning_pytorch2.14\dataLoader')
+writer = SummaryWriter(str(PROJECT_DIR / 'dataLoader'))
 
 step = 0
 nl = non_linear()

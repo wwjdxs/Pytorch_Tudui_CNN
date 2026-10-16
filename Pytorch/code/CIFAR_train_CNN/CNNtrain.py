@@ -1,125 +1,120 @@
-import torch
 import os
+import csv
+import time
+import torch
 import torchvision
 import torch.nn as nn
-from torch.utils.data import DataLoader
-from torch.utils.tensorboard import SummaryWriter
+from torch.utils.data import DataLoader, Subset
 
+# 当前最终配置：seed固定，使用与历史实验相同的训练/验证划分。
+# 历史09阶段源码保存在experiments中；本入口只修复路径与共享模型，不改变网络设置。
+device = torch.device("cpu")  # CPU版与GPU版使用同一模型、数据处理和训练设置。
+torch.manual_seed(42)
+if torch.cuda.is_available():
+    torch.cuda.manual_seed_all(42)
+torch.backends.cudnn.benchmark = False
+torch.backends.cudnn.deterministic = True
+# 对CUDA提供确定性矩阵乘法设置，比较两种loss统计时可检查权重完全一致。
+os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"
+torch.use_deterministic_algorithms(True)
 
-#引入神经网络模型
-from CNNmodel import *#隐式导入
-#显式导入：from CNNmodel import cifar as cifar, cifar10 as cifar10, input as input, nn as nn, output as output, torch as torch
+# 与测试脚本共用模型定义，避免训练和加载结构不一致。
+from CNNmodel import cifar10
 
+# 仅训练集应用随机增强；验证集使用确定性预处理。
+data_path = os.environ.get("CNN_DATA_DIR", os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "data")))
+train_transform = torchvision.transforms.Compose([
+    torchvision.transforms.RandomCrop(32, padding=4),
+    torchvision.transforms.RandomHorizontalFlip(),
+    torchvision.transforms.ToTensor(),
+    torchvision.transforms.Normalize((0.5,)*3, (0.5,)*3),
+])
+eval_transform = torchvision.transforms.Compose([
+    torchvision.transforms.ToTensor(),
+    torchvision.transforms.Normalize((0.5,)*3, (0.5,)*3),
+])
+train_all = torchvision.datasets.CIFAR10(data_path, train=True, download=False, transform=train_transform)
+validation_all = torchvision.datasets.CIFAR10(data_path, train=True, download=False, transform=eval_transform)
+# 按类别分层抽取，每类4500张训练、500张验证，所有阶段使用完全相同的索引。
+generator = torch.Generator().manual_seed(42)
+train_indices, validation_indices = [], []
+labels = torch.tensor(train_all.targets)
+for label in range(10):
+    indices = torch.where(labels == label)[0]
+    indices = indices[torch.randperm(len(indices), generator=generator)]
+    validation_indices.extend(indices[:500].tolist())
+    train_indices.extend(indices[500:].tolist())
+# 恢复原数据顺序；shuffle阶段才在每轮随机打乱。
+train_indices.sort()
+validation_indices.sort()
+train_data = Subset(train_all, train_indices)
+validation_data = Subset(validation_all, validation_indices)
+train_dataloader = DataLoader(train_data, batch_size=64, shuffle=True,
+                              generator=torch.Generator().manual_seed(42), pin_memory=device.type == "cuda")
+validation_dataloader = DataLoader(validation_data, batch_size=256, shuffle=False,
+                                   pin_memory=device.type == "cuda")
 
-#准备数据集
-train_data=torchvision.datasets.CIFAR10(root=r'E:\DeepLearning\deep_learning_pytorch2.14\data', train=True, download=False, transform=torchvision.transforms.ToTensor())
-test_data=torchvision.datasets.CIFAR10(root=r'E:\DeepLearning\deep_learning_pytorch2.14\data', train=False, download=False, transform=torchvision.transforms.ToTensor())
-#官方预先划分好的测试集
-
-
-#数据集相关信息
-train_data_size=len(train_data)
-test_data_size=len(test_data)
-
-print("训练数据集的长度：{}".format(train_data_size))#字符串格式化写法
-print("测试数据集的长度：{}".format(test_data_size))
-
-#加载数据集
-train_dataloader=DataLoader(train_data,batch_size=64)
-test_dataloader=DataLoader(test_data,batch_size=64)
-
-#创建模型
-cifar=cifar10()
-
-#创建损失函数
-loss_fun=nn.CrossEntropyLoss()#交叉熵
-
-#定义优化器
-
-#learning_rate=0.01
-learning_rate=1e-2 #1 x (10)^(-2)=0.01
-optimizer=torch.optim.SGD(cifar.parameters(), lr=learning_rate)
-
-#设置一些训练网络的参数
-
-#记录训练次数
-total_train_step=0
-
-#记录测试次数
-total_test_step=0
-
-#训练的轮数
-epoch=10
-
-#添加tensorboard
-writer = SummaryWriter(r"E:\DeepLearning\deep_learning_pytorch2.14\dataLoader")
-
-#每轮模型保存路径
-save_path='models_cifar10'
-if not os.path.exists(save_path):
-    os.makedirs(save_path)
-
+cifar = cifar10().to(device)
+loss_fun = nn.CrossEntropyLoss()
+learning_rate = 0.01
+optimizer = torch.optim.SGD(cifar.parameters(), lr=learning_rate, momentum=0.9)
+scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.1)
+epoch = 30
+current_path = os.path.dirname(os.path.abspath(__file__))
+# 每次直接运行使用新的runs目录，避免覆盖已发布的历史实验。
+save_path = os.environ.get("CNN_EXPERIMENT_OUTPUT", os.path.join(current_path, "runs", "final_" + time.strftime("%Y%m%d_%H%M%S")))
+os.makedirs(save_path, exist_ok=True)
+best_validation_accuracy = -1
+history = []
+if device.type == "cuda":
+    torch.cuda.synchronize()
+start = time.perf_counter()
 
 for i in range(epoch):
-    print("----------第{}论训练开始-----------".format(i+1))
-
-    #训练开始
-    cifar.train()#train()函数对模型的部分层有作用
-    for imgs,target in train_dataloader:
-        output=cifar(imgs)
-        loss=loss_fun(output,target)
-
-    #开始优化
-        optimizer.zero_grad()#梯度清零
+    epoch_start = time.perf_counter()
+    cifar.train()
+    total_train_loss, total_train_correct = 0.0, 0
+    for imgs, target in train_dataloader:
+        imgs, target = imgs.to(device, non_blocking=True), target.to(device, non_blocking=True)
+        output = cifar(imgs)
+        loss = loss_fun(output, target)
+        optimizer.zero_grad()
         loss.backward()
         optimizer.step()
+        total_train_loss += loss.item() * imgs.size(0)
+        total_train_correct += (output.argmax(1) == target).sum().item()
 
-        total_train_step+=1
-
-        if total_train_step%100==0:#减少输出次数
-            print("训练次数：{}, loss:{}".format(total_train_step,loss.item()))#loss.item()的作用：把tensor数据类型转化为数字（int/float）
-            writer.add_scalar("train_loss",loss.item(),total_train_step)
-
-    #每一轮训练后测试模型是否达到要求
-    #用测试数据集的正确李来评估模型
-    cifar.eval()#和train()一样，对特定层起作用
-    total_test_loss=0
-    correct_count=0
-    total_correct_count=0
-    with torch.no_grad():#梯度清零，保证不调优
-        for imgs,target in test_dataloader:
-            output=cifar(imgs)#结果是属于哪一类的概率的矩阵
-            loss=loss_fun(output,target)#部分数据的loss
-            total_test_loss+=loss
-            #loss可以除以一下size 这样得到的是单个数据的平均loss 准确率同理
-
-            #准确率
-            correct_count=(output.argmax(1)==target).sum()
-            total_correct_count+=correct_count
-            
-
-    correct_rate=total_correct_count/test_data_size
-    print("第{}轮整体测试集上的正确率:{}".format(i+1,correct_rate))
-    print("第{}轮整体测试集上的loss:{}".format(i+1,total_test_loss))
-    total_test_step+=1
-    writer.add_scalar("correct_rate", correct_rate,total_test_step)
-    writer.add_scalar("test_loss",total_test_loss,total_test_step)
-
-    #分类问题常用测试
-    #Argmax把ouput从矩阵转化成索引，即找到矩阵中的最大值的索引，记为pred
-    #用==判断pred和target是否相等，输出结果为T和F的矩阵，T为1，F为0
-    #用sum求和，再让正确个数/总个数，得到正确率
-
-
-    #保存每一轮的模型，找到最好
-    
-    
-
-    torch.save(cifar.state_dict(),os.path.join(save_path,"cifar{}.pth".format(i)))
-    print('模型已保存')
-
-
-
-
-
-
+    cifar.eval()
+    total_validation_loss, total_correct_count = 0.0, 0
+    validation_batch_loss_sum = 0.0
+    with torch.no_grad():
+        for imgs, target in validation_dataloader:
+            imgs, target = imgs.to(device, non_blocking=True), target.to(device, non_blocking=True)
+            output = cifar(imgs)
+            loss = loss_fun(output, target)
+            total_validation_loss += loss.item() * imgs.size(0)
+            validation_batch_loss_sum += loss.item()
+            total_correct_count += (output.argmax(1) == target).sum().item()
+    validation_loss = total_validation_loss / len(validation_data)
+    validation_accuracy = total_correct_count / len(validation_data)
+    row = dict(epoch=i+1, lr=optimizer.param_groups[0]["lr"],
+               train_loss=total_train_loss/len(train_data), train_accuracy=total_train_correct/len(train_data),
+               validation_loss=validation_loss, validation_accuracy=validation_accuracy,
+               legacy_loss_sum=validation_batch_loss_sum, seconds=time.perf_counter()-epoch_start)
+    history.append(row)
+    with open(os.path.join(save_path, "metrics.csv"), "w", newline="", encoding="utf-8") as file:
+        recorder = csv.DictWriter(file, fieldnames=list(row))
+        recorder.writeheader()
+        recorder.writerows(history)
+    if validation_accuracy > best_validation_accuracy:
+        best_validation_accuracy = validation_accuracy
+        torch.save(cifar.state_dict(), os.path.join(save_path, "best.pth"))
+        best_epoch = i+1
+    # 前面阶段展示原始batch均值之和；最后阶段只改展示为样本平均loss。
+    # CSV始终同时记录两者，便于比较；该改变不参与反向传播。
+    print("09_loss_mean {}/{} train={:.2%} val={:.2%} loss={:.4f}".format(
+        i+1, epoch, row["train_accuracy"], validation_accuracy, validation_loss), flush=True)
+    scheduler.step()
+torch.save(cifar.state_dict(), os.path.join(save_path, "last.pth"))
+training_seconds = time.perf_counter()-start
+print("09_loss_mean 完成，最佳验证轮次：{}，耗时：{:.1f}s".format(best_epoch, training_seconds), flush=True)

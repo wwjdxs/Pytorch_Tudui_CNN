@@ -1,9 +1,13 @@
+from pathlib import Path
+
+# 相对于仓库Pytorch目录定位数据和输出，不依赖E盘或启动位置。
+PROJECT_DIR = Path(__file__).resolve().parents[2]
+
 import torch
 from torch import nn
-from torch.utils.tensorboard import SummaryWriter
 import torchvision
 
-dataset=torchvision.datasets.CIFAR10(root='./data', train=False, download=False, transform=torchvision.transforms.ToTensor())
+dataset=torchvision.datasets.CIFAR10(root=str(PROJECT_DIR / 'data'), train=False, download=False, transform=torchvision.transforms.ToTensor())
 dataloader=torch.utils.data.DataLoader(dataset, batch_size=1)
 
 
@@ -29,7 +33,6 @@ class CIFAR10(nn.Module):
 
 
 cifar10_model = CIFAR10()
-writer = SummaryWriter(log_dir=r'E:\DeepLearning\deep_learning_pytorch2.14\dataLoader')
 
 
 #反向传播-loss function

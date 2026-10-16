@@ -1,18 +1,20 @@
+from pathlib import Path
+
+# 相对于仓库Pytorch目录定位数据和输出，不依赖E盘或启动位置。
+PROJECT_DIR = Path(__file__).resolve().parents[2]
+
 from PIL import Image
 from torchvision import transforms
 from torch.utils.tensorboard import SummaryWriter
-from pathlib import Path
-import shutil
+import time
 
-# 每次运行前清空项目根目录下的 logs 文件夹
-log_dir = Path(__file__).resolve().parent.parent / "logs"
-if log_dir.exists():
-    shutil.rmtree(log_dir)
+# 每次运行创建独立日志目录，保留旧记录。
+log_dir = Path(__file__).resolve().parent.parent / "logs" / (Path(__file__).stem + "_" + str(time.time_ns()))
 
 writer = SummaryWriter(log_dir=str(log_dir))
 
 #img初始是PIL.Image.Image类型
-img=Image.open(r"E:\DeepLearning\deep_learning_pytorch2.14\data\train\bees\85112639_6e860b0469.jpg")
+img=Image.open(str(PROJECT_DIR / 'data/train/bees/85112639_6e860b0469.jpg'))
 print(img)
 
 #transforms.ToTensor()
@@ -37,7 +39,7 @@ img_normalized = normalized(img_tensor)
 
 #1.三个数依次对应 R、G、B
 #2.在使用transforms.Normalize()之前，必须先使用transforms.ToTensor()将图片转换为tensor格式
-#3.均值(mean)和标准差(standard deviation)的取值范围是[0,1]
+#3.std必须大于0；mean/std取决于输入尺度，并非必须在[0,1]。
 #4.训练集、验证集和推理图片应采用相同的 mean、std
 #5.如果使用预训练模型，mean和std应与预训练模型的训练集一致
 writer.add_image("Normalized", img_normalized)

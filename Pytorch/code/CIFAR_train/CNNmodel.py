@@ -27,7 +27,20 @@ if __name__=='__main__':
     #用一组正确的输入输出来验证
     input=torch.ones((64,3,32,32))
     output=cifar(input)
-    print(output.shape)#torch.Size([64, 10]),意味着返回64行*10列，中间的数据是分类概率
+    print(output.shape)#torch.Size([64, 10]),意味着返回64行*10列，中间的数据是每类logits，不是概率
 
 
 
+
+
+def load_checkpoint_state(path):
+    """兼容早期完整模型与后来的state_dict，只允许已知基线类参与反序列化。"""
+    allowed = [(cifar10, "CNNmodel.cifar10"), nn.Sequential, nn.Conv2d,
+               nn.MaxPool2d, nn.Flatten, nn.Linear]
+    with torch.serialization.safe_globals(allowed):
+        saved = torch.load(path, map_location="cpu", weights_only=True)
+    if isinstance(saved, nn.Module):
+        return saved.state_dict()
+    if isinstance(saved, dict):
+        return saved
+    raise ValueError("不支持的基线权重格式")

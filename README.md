@@ -1,64 +1,58 @@
-2026/9-2026/10/11
+# PyTorch 小土堆教程学习与 CIFAR10 CNN 实验
 
-============完成b站小土堆Pytorch视频跟练=============
+这个仓库记录了 B 站小土堆 PyTorch 教程的学习代码，以及在此基础上进行的 CNN 逐步改进实验。
 
-视频链接：https://www.bilibili.com/video/BV1hE411t7RN/?spm_id_from=333.337.search-card.all.click&vd_source=652256353e7af95b93d5bf06f3150d94
+> 如果你看到带有加号、减号和行号的页面，那是 GitHub 的提交差异页，显示的是 Markdown 源码。要阅读排版后的说明，请打开[仓库主页](https://github.com/wwjdxs/Pytorch_Tudui_CNN)或 README 的 Preview，而不是提交链接中的 diff。
 
-全程手打代码+根据版本更新修改了部分代码
+## 当前结果
 
-最终产出：CIFAR10分类模型，但是正确率较低，没有训练完成
+CNN 最终配置在 CIFAR10 官方测试集上的准确率为 **80.63%**。本轮固定种子 42，使用 45,000 张训练图片、5,000 张验证图片和 10,000 张官方测试图片；检查点只按验证准确率选择。10 个累计配置共训练 260 轮，测试准确率如下。
 
-
-## 2026-10-16：CNN逐步改进实验
-
-在原教程代码之外新增 [CNN实验目录](Pytorch/code/CIFAR_train_CNN)，保留早期 `Pytorch/code/CIFAR_train` 作为学习记录。本次未包含ViT代码。
-
-固定随机种子42，将CIFAR10官方训练集分层划分为45,000张训练、5,000张验证。各阶段从头训练，按验证准确率选择检查点；全部方案完成后统一评估官方10,000张测试图片，共10组、260轮训练。
-
-|累计改动|训练轮数|测试准确率|
+|累计配置|训练轮数|测试准确率|
 |---|---:|---:|
 |原始网络基线|10|44.89%|
-|加ReLU|10|35.92%|
+|加 ReLU|10|35.92%|
 |延长训练|30|64.72%|
-|SGD动量|30|65.71%|
+|SGD 动量|30|65.71%|
 |学习率衰减|30|70.10%|
 |打乱训练数据|30|71.35%|
 |标准化|30|74.97%|
-|随机裁剪和水平翻转|30|79.57%|
-|BatchNorm，并移除卷积bias|30|80.63%|
-|仅修正loss显示口径|30|80.63%|
+|随机裁剪与水平翻转|30|79.57%|
+|BatchNorm，并移除卷积 bias|30|80.63%|
+|只修正 loss 显示口径|30|80.63%|
 
-最终比本轮基线提高35.74个百分点。参数量从145,578增至145,706。数据增强前后，无增强训练集与测试集的准确率差距从24.05降至3.58个百分点。loss显示修正前后的模型权重完全一致。
+这是**单种子的探索性累加实验**，不能宣称统计显著，也不能断言每个改动对其他网络都有效。ReLU 在短训练中出现下降，最后两个配置的模型权重完全一致。早期使用全部 50,000 张训练图片得到的 56.25% 属于另一轮实验，不是本表的严格配对基线。
 
-这是单种子的探索性累加实验，不能宣称统计显著；ReLU短训练出现下降，不能声称每一步都能提升准确率。BN步骤同时移除了卷积bias。各阶段效应依赖此前配置。此前使用全部50,000张训练图片得到的56.25%不是本轮严格配对基线。
+## 从哪里开始
 
-### 日志与结果
+- [运行与复现指南](docs/QUICKSTART.md)：环境准备、训练、测试和生成图表的具体步骤。
+- [完整实验日志](Pytorch/code/CIFAR_train_CNN/CNN实验日志_20261016_150749.md)：逐步结果、代码改动、现象与局限。
+- [仓库检查与修复报告](docs/REPOSITORY_AUDIT.md)：本次发现的问题、修复内容及验证范围。
+- [结果总表](Pytorch/code/CIFAR_train_CNN/experiments/20261016_150749/summary.csv)、[实验设置](Pytorch/code/CIFAR_train_CNN/experiments/20261016_150749/protocol.json)、[最终最佳权重](Pytorch/code/CIFAR_train_CNN/experiments/20261016_150749/09_loss_mean/best.pth)。
 
-- [完整实验日志与分析](Pytorch/code/CIFAR_train_CNN/CNN实验日志_20261016_150749.md)
-- [实验结果CSV](Pytorch/code/CIFAR_train_CNN/experiments/20261016_150749/summary.csv)
-- [实验设置](Pytorch/code/CIFAR_train_CNN/experiments/20261016_150749/protocol.json)
-- [逐步代码差异](Pytorch/code/CIFAR_train_CNN/experiments/20261016_150749/changes.patch)
-- [最终最佳权重](Pytorch/code/CIFAR_train_CNN/experiments/20261016_150749/09_loss_mean/best.pth)
-- [原始脚本备份](Pytorch/code/CIFAR_train_CNN/experiments/20261016_150749/original_CNNtrain_gpu1.py)
-- [早期完整训练集基线记录](Pytorch/code/CNN_baseline_results/20261016_145714)
+## 目录说明
 
-![逐步实验图表](Pytorch/code/CIFAR_train_CNN/experiments/20261016_150749/experiment_comparison.png)
+|目录|用途|
+|---|---|
+|Pytorch/code/CIFAR_train_CNN|当前 CNN 模型、CPU/GPU 训练、测试和实验工具；推荐使用此目录|
+|Pytorch/code/CIFAR_train_CNN/experiments|历史实验的源码快照、指标、图表与权重，不随当前代码修复而改写|
+|Pytorch/code/CIFAR_train|早期教程基线，与最终 BatchNorm 模型不同|
+|Pytorch/code/basic_tools|Dataset、DataLoader 和图像变换示例|
+|Pytorch/code/torch.nn|卷积、池化、激活、Linear、损失与优化示例|
+|Pytorch/code/model|模型保存加载、VGG 等示例|
+|Pytorch/code/CNN_baseline_results|早期完整训练集基线记录|
+|Pytorch/notebook|早期 Notebook 学习记录|
 
-### 复现
+当前训练与测试入口共用 CNNmodel.py。新版 CNNtest.py 默认读取已发布的最终最佳权重，并采用对应的标准化。历史阶段快照仍保留当时的本机路径，应通过实验工具重新生成跨机器可运行的版本；不要直接将旧教程的模型类用于加载最终权重。
 
-训练环境需要PyTorch、torchvision和Pillow；图表分析另外需要matplotlib。本次运行PyTorch 2.15.0.dev20260913+cu130，GPU为RTX 5060 Laptop，版本信息保存在protocol.json。无需TensorBoard。
+## 实验图表
 
-先下载CIFAR10，并修改 `CNN_experiment_runner.py` 中的 `DATA` 和模板中的 `data_path` 为本机数据目录；直接运行最终训练脚本时，仅需修改该脚本的 `data_path`。实验器包含CUDA专用评估，本轮完整复现需要可用的CUDA环境。
+![CNN逐步改进结果](Pytorch/code/CIFAR_train_CNN/experiments/20261016_150749/experiment_comparison.png)
 
-```bash
-# 逐步生成各版本、训练并记录，结果进入带时间戳的experiments子目录
-python Pytorch/code/CIFAR_train_CNN/CNN_experiment_runner.py
+## 数据与依赖
 
-# 读取已完成的结果，生成分析日志与图表（将时间戳替换为自己的运行目录）
-python Pytorch/code/CIFAR_train_CNN/CNN_experiment_analysis.py Pytorch/code/CIFAR_train_CNN/experiments/20261016_150749
+早期提交已经包含 CIFAR10 数据文件和 ants/bees 示例图片；.gitignore 不会自动取消对已提交文件的跟踪。当前版本保留这些教学数据；新产生的Python缓存和默认runs训练输出由.gitignore忽略，新的正式实验记录可按需要提交。历史中的数据仍会影响仓库下载大小，本次没有重写 Git 历史。
 
-# 只训练最终配置
-python Pytorch/code/CIFAR_train_CNN/CNNtrain_gpu1.py
-```
+当前 CNN 入口不需要 TensorBoard。旧教程中的可视化示例需要额外安装 TensorBoard；VGG 预训练示例首次运行还需要下载官方权重，模型保存示例会生成较大的文件。具体环境与运行顺序见运行指南。
 
-每阶段包含当时的源码、逐轮指标、最佳/最终权重和混淆矩阵。当前 `CNNtrain_gpu1.py` 是最终阶段的版本。实验器会依次重写该脚本，请先保存个人修改。完整实验器用等价的CPU张量缓存减少重复PIL转换；每轮随机增强不会被缓存。仓库不包含数据集、Python缓存或本次TensorBoard临时文件。日志中的绝对路径是原实验机器的历史记录，下载后以仓库相对路径为准。
+教程学习时间：2026 年 9 月至 10 月。原视频：[小土堆 PyTorch 教程](https://www.bilibili.com/video/BV1hE411t7RN/)。本仓库本轮不包含 ViT 实验。

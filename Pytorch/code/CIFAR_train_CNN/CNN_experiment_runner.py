@@ -1,4 +1,4 @@
-"""逐步累加实验：生成当前训练脚本、运行、保存版本与结果。直接运行本文件即可复现。
+"""逐步累加实验：生成隔离的阶段脚本、运行、保存版本与结果。直接运行本文件即可复现。
 研究辅助脚本集中使用CSV/JSON等记录工具，CNNtrain_gpu1.py仍保持顺序式教学结构。
 """
 import os
@@ -14,7 +14,7 @@ from torch.utils.data import Dataset, DataLoader
 
 BASE = Path(__file__).resolve().parent
 SOURCE = BASE / "CNNtrain_gpu1.py"
-DATA = r"E:\DeepLearning\deep_learning_pytorch2.14\Pytorch\data"
+DATA = Path(os.environ.get("CNN_DATA_DIR", BASE.parents[1] / "data")).resolve()
 SEED = 42
 # 按预定顺序累加配置；增强为裁剪与翻转组合，BN步骤同时移除卷积bias。
 STAGES = [
@@ -49,7 +49,7 @@ def make_source(stage):
     if normalize: train_transforms += ["    torchvision.transforms.Normalize((0.5,)*3, (0.5,)*3),"]
     eval_transforms = ["    torchvision.transforms.ToTensor(),"]
     if normalize: eval_transforms += ["    torchvision.transforms.Normalize((0.5,)*3, (0.5,)*3),"]
-    return TEMPLATE.replace("__STAGE__",name).replace("__LAYERS__","\n".join(layers)).replace("__TRAIN_TRANSFORMS__","\n".join(train_transforms)).replace("__EVAL_TRANSFORMS__","\n".join(eval_transforms)).replace("__EPOCHS__",str(epochs)).replace("__MOMENTUM__",str(momentum)).replace("__SHUFFLE__",str(shuffle)).replace("__SCHEDULER_INIT__",'scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.1)' if schedule else '# 本阶段使用固定学习率。').replace("__SCHEDULER_STEP__",'    scheduler.step()' if schedule else '').replace("__DISPLAY_LOSS__",'validation_loss' if mean_loss else 'validation_batch_loss_sum')
+    return TEMPLATE.replace("__SEED__", str(SEED)).replace("__DATA_PATH__", repr(str(DATA))).replace("__STAGE__",name).replace("__LAYERS__","\n".join(layers)).replace("__TRAIN_TRANSFORMS__","\n".join(train_transforms)).replace("__EVAL_TRANSFORMS__","\n".join(eval_transforms)).replace("__EPOCHS__",str(epochs)).replace("__MOMENTUM__",str(momentum)).replace("__SHUFFLE__",str(shuffle)).replace("__SCHEDULER_INIT__",'scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.1)' if schedule else '# 本阶段使用固定学习率。').replace("__SCHEDULER_STEP__",'    scheduler.step()' if schedule else '').replace("__DISPLAY_LOSS__",'validation_loss' if mean_loss else 'validation_batch_loss_sum')
 
 
 # 模板保留与原CNN脚本相同的模型、数据、优化器、训练、评估、保存的阅读顺序。
@@ -64,9 +64,9 @@ from torch.utils.data import DataLoader, Subset
 # 实验阶段：__STAGE__。seed固定，使用同一训练/验证划分。
 # 直接运行本文件会训练本阶段；批量逐步实验请运行CNN_experiment_runner.py。
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-torch.manual_seed(42)
+torch.manual_seed(__SEED__)
 if torch.cuda.is_available():
-    torch.cuda.manual_seed_all(42)
+    torch.cuda.manual_seed_all(__SEED__)
 torch.backends.cudnn.benchmark = False
 torch.backends.cudnn.deterministic = True
 # 对CUDA提供确定性矩阵乘法设置，比较两种loss统计时可检查权重完全一致。
@@ -84,7 +84,7 @@ __LAYERS__
         return self.model(x)
 
 # 仅训练集应用随机增强；验证集使用确定性预处理。
-data_path = r"E:\DeepLearning\deep_learning_pytorch2.14\Pytorch\data"
+data_path = os.environ.get("CNN_DATA_DIR", __DATA_PATH__)
 train_transform = torchvision.transforms.Compose([
 __TRAIN_TRANSFORMS__
 ])
@@ -94,7 +94,7 @@ __EVAL_TRANSFORMS__
 train_all = torchvision.datasets.CIFAR10(data_path, train=True, download=False, transform=train_transform)
 validation_all = torchvision.datasets.CIFAR10(data_path, train=True, download=False, transform=eval_transform)
 # 按类别分层抽取，每类4500张训练、500张验证，所有阶段使用完全相同的索引。
-generator = torch.Generator().manual_seed(42)
+generator = torch.Generator().manual_seed(__SEED__)
 train_indices, validation_indices = [], []
 labels = torch.tensor(train_all.targets)
 for label in range(10):
@@ -108,7 +108,7 @@ validation_indices.sort()
 train_data = Subset(train_all, train_indices)
 validation_data = Subset(validation_all, validation_indices)
 train_dataloader = DataLoader(train_data, batch_size=64, shuffle=__SHUFFLE__,
-                              generator=torch.Generator().manual_seed(42), pin_memory=device.type == "cuda")
+                              generator=torch.Generator().manual_seed(__SEED__), pin_memory=device.type == "cuda")
 validation_dataloader = DataLoader(validation_data, batch_size=256, shuffle=False,
                                    pin_memory=device.type == "cuda")
 
@@ -185,11 +185,12 @@ class CachedCIFAR(Dataset):
     original = torchvision.datasets.CIFAR10
 
     def __init__(self, root, train=True, download=False, transform=None, **kwargs):
-        if train not in self.cache:
+        key = (str(Path(root).resolve()), train)
+        if key not in self.cache:
             data = self.original(root, train=train, download=download)
             tensor = torch.from_numpy(data.data).permute(0,3,1,2).contiguous().float().div_(255)
-            self.cache[train] = (tensor, data.targets, data.classes)
-        self.images, self.targets, self.classes = self.cache[train]
+            self.cache[key] = (tensor, data.targets, data.classes)
+        self.images, self.targets, self.classes = self.cache[key]
         # 裁剪、翻转、标准化对Tensor与PIL转换后的像素运算等价。
         self.transforms = [] if transform is None else [t for t in transform.transforms if not isinstance(t, torchvision.transforms.ToTensor)]
 
@@ -205,19 +206,22 @@ def evaluate(model, loader):
     model.eval()
     loss_sum, correct, total = 0.0, 0, 0
     confusion = torch.zeros(10,10,dtype=torch.long)
+    device = next(model.parameters()).device
     with torch.no_grad():
         for images, labels in loader:
-            images, labels = images.cuda(), labels.cuda()
+            images, labels = images.to(device), labels.to(device)
             logits = model(images)
             loss_sum += nn.functional.cross_entropy(logits, labels, reduction="sum").item()
             predictions = logits.argmax(1)
             correct += (predictions == labels).sum().item()
             total += labels.numel()
             confusion += torch.bincount((labels*10+predictions).cpu(), minlength=100).reshape(10,10)
+    if total == 0:
+        raise ValueError("评估数据集不能为空")
     return dict(accuracy=correct/total, mean_loss=loss_sum/total, confusion=confusion.tolist())
 
 
-def main():
+def _run_experiments():
     if not torch.cuda.is_available(): raise RuntimeError("本实验预设使用CUDA")
     torch.set_num_threads(4)
     stamp = time.strftime("%Y%m%d_%H%M%S")
@@ -227,10 +231,10 @@ def main():
     metadata = dict(seed=SEED, train_samples=45000, validation_samples=5000, test_samples=10000,
                     device=torch.cuda.get_device_name(),torch_version=str(torch.__version__),
                     stages=STAGES, batch_size=64, evaluation_batch_size=256,
-                    deterministic=True, cache="CPU ToTensor cache, no random augmentation cached")
+                    deterministic=True, data_directory=str(DATA), cache="CPU ToTensor cache, no random augmentation cached")
     (output/"protocol.json").write_text(json.dumps(metadata,indent=2,ensure_ascii=False),encoding="utf-8")
     log = BASE / ("CNN实验日志_"+stamp+".md")
-    log.write_text("# CNN逐步改进实验日志\n\n固定种子42，分层训练/验证=45000/5000；测试集10000张在全部方案完成后统一评估。每步从头训练，采用验证准确率最高的轮次。单种子探索性实验。\n\n输出目录：`"+str(output)+"`\n\n",encoding="utf-8")
+    log.write_text(f"# CNN逐步改进实验日志\n\n固定种子{SEED}，分层训练/验证=45000/5000；测试集10000张在全部方案完成后统一评估。每步从头训练，采用验证准确率最高的轮次。单种子探索性实验。\n\n输出目录：`"+str(output)+"`\n\n",encoding="utf-8")
     print("RUN_DIRECTORY:",output,flush=True)
     print("LOG_FILE:",log,flush=True)
     torchvision.datasets.CIFAR10 = CachedCIFAR
@@ -241,10 +245,9 @@ def main():
         stage_dir = output/name
         stage_dir.mkdir()
         source = make_source(stage)
-        SOURCE.write_text(source,encoding="utf-8")
         (stage_dir/"CNNtrain_gpu1.py").write_text(source,encoding="utf-8")
         os.environ["CNN_EXPERIMENT_OUTPUT"] = str(stage_dir)
-        namespace = runpy.run_path(str(SOURCE),run_name="__main__")
+        namespace = runpy.run_path(str(stage_dir/"CNNtrain_gpu1.py"),run_name="__main__")
         best = max(namespace["history"],key=lambda row: row["validation_accuracy"])
         summary = dict(stage=name, epochs=stage[1], best_epoch=best["epoch"],
                        validation_accuracy=best["validation_accuracy"], validation_loss=best["validation_loss"],
@@ -265,6 +268,8 @@ def main():
     first = torch.load(output/"08_batchnorm"/"last.pth",map_location="cpu",weights_only=True)
     second = torch.load(output/"09_loss_mean"/"last.pth",map_location="cpu",weights_only=True)
     same_weights = all(torch.equal(first[key],second[key]) for key in first)
+    if not same_weights:
+        raise RuntimeError("loss展示修正前后的权重不一致，请检查确定性设置")
     print("LOSS_REPORTING_WEIGHTS_IDENTICAL:",same_weights,flush=True)
     with log.open("a",encoding="utf-8") as file:
         file.write("loss展示修正前后最终权重完全一致：`"+str(same_weights)+"`。\n\n")
@@ -276,7 +281,7 @@ def main():
         namespace = {"__file__":str(SOURCE)}
         exec(compile(source,str(SOURCE),"exec"),namespace)
         model = namespace["cifar10"]().cuda()
-        model.load_state_dict(torch.load(output/name/"best.pth",weights_only=True))
+        model.load_state_dict(torch.load(output/name/"best.pth",map_location="cpu",weights_only=True))
         test_data = CachedCIFAR(DATA,train=False,transform=namespace["eval_transform"])
         clean_train = torch.utils.data.Subset(namespace["validation_all"],namespace["train_indices"])
         train_metrics = evaluate(model,DataLoader(clean_train,batch_size=256))
@@ -294,6 +299,21 @@ def main():
         recorder.writeheader(); recorder.writerows(summaries)
     os.environ.pop("CNN_EXPERIMENT_OUTPUT",None)
     print("ALL_EXPERIMENTS_COMPLETE",output,flush=True)
+
+
+def main():
+    # 即使训练中途报错，也恢复进程级数据集替换和环境变量，便于在IDE中再次运行。
+    previous_dataset = torchvision.datasets.CIFAR10
+    previous_output = os.environ.get("CNN_EXPERIMENT_OUTPUT")
+    try:
+        _run_experiments()
+    finally:
+        torchvision.datasets.CIFAR10 = previous_dataset
+        if previous_output is None:
+            os.environ.pop("CNN_EXPERIMENT_OUTPUT", None)
+        else:
+            os.environ["CNN_EXPERIMENT_OUTPUT"] = previous_output
+        CachedCIFAR.cache.clear()
 
 
 if __name__ == "__main__":

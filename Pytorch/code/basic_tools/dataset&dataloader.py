@@ -1,3 +1,8 @@
+from pathlib import Path
+
+# 相对于仓库Pytorch目录定位数据和输出，不依赖E盘或启动位置。
+PROJECT_DIR = Path(__file__).resolve().parents[2]
+
 #pyright: reportMissingImports=false
 
 from torch.utils.data import Dataset, DataLoader
@@ -9,7 +14,7 @@ class Mydata(Dataset):
         self.root_dir = root_dir
         self.label_dir = label_dir
         self.path = os.path.join(root_dir, label_dir)
-        self.img_path=os.listdir(self.path)
+        self.img_path=sorted(os.listdir(self.path))
 
     def __len__(self): #显示data长度
         return len(self.img_path)
@@ -17,12 +22,13 @@ class Mydata(Dataset):
     def __getitem__(self, idx): #根据索引返回数据
         img_name = self.img_path[idx]
         img_item_path=os.path.join(self.path,img_name)#root+lable+name
-        img=Image.open(img_item_path) 
+        with Image.open(img_item_path) as image:
+            img = image.convert("RGB")  # 读成独立图像后关闭文件句柄
         label=self.label_dir
         return img, label
 
 
-ants_dataset=Mydata(root_dir='data/train',label_dir='ants')
+ants_dataset=Mydata(root_dir=str(PROJECT_DIR / 'data/train'),label_dir='ants')
 
 print(ants_dataset.__getitem__(0)) #测试数据集（self不用填写）
 print(ants_dataset[0]) #两种写法等价

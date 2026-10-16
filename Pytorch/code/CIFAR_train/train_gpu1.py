@@ -1,3 +1,8 @@
+from pathlib import Path
+
+# 相对于仓库Pytorch目录定位数据和输出，不依赖E盘或启动位置。
+PROJECT_DIR = Path(__file__).resolve().parents[2]
+
 #第一种GPU训练方式
 
 import torch
@@ -35,8 +40,8 @@ class cifar10(nn.Module):
 
 
 #准备数据集
-train_data=torchvision.datasets.CIFAR10(root=r'E:\DeepLearning\deep_learning_pytorch2.14\Pytorch\data', train=True, download=False, transform=torchvision.transforms.ToTensor())
-test_data=torchvision.datasets.CIFAR10(root=r'E:\DeepLearning\deep_learning_pytorch2.14\Pytorch\data', train=False, download=False, transform=torchvision.transforms.ToTensor())
+train_data=torchvision.datasets.CIFAR10(root=str(PROJECT_DIR / 'data'), train=True, download=False, transform=torchvision.transforms.ToTensor())
+test_data=torchvision.datasets.CIFAR10(root=str(PROJECT_DIR / 'data'), train=False, download=False, transform=torchvision.transforms.ToTensor())
 #官方预先划分好的测试集
 
 
@@ -77,10 +82,10 @@ total_test_step=0
 epoch=10
 
 #添加tensorboard
-writer = SummaryWriter(r"E:\DeepLearning\deep_learning_pytorch2.14\Pytorch\dataLoader")
+writer = SummaryWriter(str(PROJECT_DIR / 'dataLoader'))
 
 #每轮模型保存路径
-save_path='models_cifar10'
+save_path=str(Path(__file__).resolve().parent / 'models_cifar10')
 if not os.path.exists(save_path):
     os.makedirs(save_path)
 
@@ -114,21 +119,22 @@ for i in range(epoch):
     total_test_loss=0
     correct_count=0
     total_correct_count=0
-    with torch.no_grad():#梯度清零，保证不调优
+    with torch.no_grad():#不记录梯度计算图，不更新参数
         for data in test_dataloader:
             imgs,target=data
             imgs=imgs.to(device)
             target=target.to(device)
-            output=cifar(imgs)#结果是属于哪一类的概率的矩阵
+            output=cifar(imgs)#每类原始得分logits，不是概率
             loss=loss_fun(output,target)#部分数据的loss
-            total_test_loss+=loss
+            total_test_loss+=loss.item() * imgs.size(0)
             #loss可以除以一下size 这样得到的是单个数据的平均loss 准确率同理
 
             #准确率
-            correct_count=(output.argmax(1)==target).sum()
+            correct_count=(output.argmax(1)==target).sum().item()
             total_correct_count+=correct_count
             
 
+    total_test_loss = total_test_loss / test_data_size
     correct_rate=total_correct_count/test_data_size
     print("第{}轮整体测试集上的正确率:{}".format(i+1,correct_rate))
     print("第{}轮整体测试集上的loss:{}".format(i+1,total_test_loss))
@@ -149,8 +155,4 @@ for i in range(epoch):
     torch.save(cifar.state_dict(),os.path.join(save_path,"cifar{}.pth".format(i)))
     print('模型已保存')
 
-
-
-
-
-
+writer.close()

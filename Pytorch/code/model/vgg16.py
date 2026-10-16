@@ -16,5 +16,5 @@ vgg16_false = torchvision.models.vgg16(weights=None)
 #对现有vgg16模型进行微调
 #vgg16_true.classifier[6] = nn.Linear(in_features=4096, out_features=10)  #修改最后一层全连接层的输出为10类 
 
-vgg16_true.classifier.add_module('add_linear', nn.Linear(in_features=4096, out_features=10))  #添加一个新的全连接层，输出为10类
+vgg16_true.classifier.add_module('add_linear', nn.Linear(in_features=1000, out_features=10))  # 原VGG输出1000类，追加层必须接收1000维
 print(vgg16_true)  #打印模型结构

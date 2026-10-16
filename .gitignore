@@ -1,9 +1,22 @@
-Pytorch/data/cifar-10-python.tar.gz
-data/
-Pytorch/data/
-Pytorch/code/logs/
-# Python caches and newly generated temporary training events
+# 本地数据（历史已提交数据仍保留；这里只忽略新增文件）
+/Pytorch/data/
+/data/
+
+# Python与IDE缓存
 __pycache__/
 *.py[cod]
+.pytest_cache/
+.idea/
+.vscode/
+
+# 新产生的训练与TensorBoard输出；已发布实验权重不被忽略
+/Pytorch/code/logs/
+/Pytorch/code/CIFAR_train_CNN/runs/
+/Pytorch/code/CIFAR_train/models_cifar10/
 /Pytorch/code/CNN_baseline_results/**/tensorboard/
-/Pytorch/code/CIFAR_train_CNN/**/events.out.tfevents.*
+events.out.tfevents.*
+
+# VGG保存/加载教程生成的大权重
+/Pytorch/code/model/*.pth
+/vgg16_model*.pth
+/mymodel.pth

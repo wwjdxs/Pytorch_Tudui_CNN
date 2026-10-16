@@ -1,0 +1,4 @@
+-r requirements.txt
+tensorboard
+# Tensorboard notebook includes an OpenCV example
+opencv-python

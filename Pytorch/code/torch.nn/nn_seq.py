@@ -1,3 +1,8 @@
+from pathlib import Path
+
+# 相对于仓库Pytorch目录定位数据和输出，不依赖E盘或启动位置。
+PROJECT_DIR = Path(__file__).resolve().parents[2]
+
 import torch
 from torch import nn
 from torch.utils.tensorboard import SummaryWriter
@@ -37,7 +42,7 @@ class CIFAR10(nn.Module):
 
 
 cifar10_model = CIFAR10()
-writer = SummaryWriter(log_dir=r'E:\DeepLearning\deep_learning_pytorch2.14\dataLoader')
+writer = SummaryWriter(log_dir=str(PROJECT_DIR / 'dataLoader'))
 
 input=torch.ones(64,3,32,32) # batch_size=64, channels=3, height=32, width=32
 writer.add_graph(cifar10_model, input)

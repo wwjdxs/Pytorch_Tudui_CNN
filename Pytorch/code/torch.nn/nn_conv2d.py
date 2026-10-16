@@ -1,8 +1,12 @@
+from pathlib import Path
+
+# 相对于仓库Pytorch目录定位数据和输出，不依赖E盘或启动位置。
+PROJECT_DIR = Path(__file__).resolve().parents[2]
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torchvision
-from pathlib import Path
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 
@@ -10,7 +14,7 @@ from torch.utils.tensorboard import SummaryWriter
 #1、导入数据
 
 
-dataset=torchvision.datasets.CIFAR10(root='./data', train=False, download=False, transform=torchvision.transforms.ToTensor())
+dataset=torchvision.datasets.CIFAR10(root=str(PROJECT_DIR / 'data'), train=False, download=False, transform=torchvision.transforms.ToTensor())
 
 dataloader=DataLoader(dataset,batch_size=64)
 
@@ -27,7 +31,7 @@ class CNN(nn.Module):
 
 cnn=CNN()
 
-writer=SummaryWriter(r'E:\DeepLearning\deep_learning_pytorch2.14\dataLoader')
+writer=SummaryWriter(str(PROJECT_DIR / 'dataLoader'))
 
 step=0
 for data in dataloader:
@@ -42,8 +46,8 @@ for data in dataloader:
 
     output=torch.reshape(output, (-1, 3, 30, 30)) #reshape成3通道数据
 
-    writer.add_image('input', imgs, step)
-    writer.add_image('output', output, step)
+    writer.add_images('input', imgs, step)
+    writer.add_images('output', output, step)
 
     step+=1
 
